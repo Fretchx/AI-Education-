@@ -1,0 +1,8 @@
+{
+  "name": "Copy of CS Companion AI",
+  "description": "A mobile-first AI tutor designed specifically for Computer Science students to help with algorithms, debugging, and code concepts.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
