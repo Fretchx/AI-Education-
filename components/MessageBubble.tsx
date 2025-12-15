@@ -4,9 +4,10 @@ import CodeBlock from './CodeBlock';
 
 interface MessageBubbleProps {
   message: Message;
+  isDarkMode: boolean;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isDarkMode }) => {
   const isUser = message.role === Role.USER;
 
   // Simple Markdown parser to separate code blocks from text
@@ -23,10 +24,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       }
       
       // Render Bold and Italic text (simplified)
+      // Dynamic inline code style based on theme
+      const inlineCodeClass = isDarkMode 
+        ? 'bg-slate-700 text-blue-200' 
+        : 'bg-slate-200 text-blue-700 border border-slate-300';
+
       const formattedText = part
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/`([^`]+)`/g, '<code class="bg-slate-700 px-1 py-0.5 rounded text-sm font-mono text-blue-200">$1</code>'); // Inline code
+        .replace(/`([^`]+)`/g, `<code class="${inlineCodeClass} px-1.5 py-0.5 rounded text-sm font-mono">$1</code>`); // Inline code
 
       return (
         <p 
@@ -38,14 +44,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     });
   };
 
+  const bubbleStyle = isUser
+    ? 'bg-primary text-white rounded-br-sm shadow-md' // User bubble stays primary
+    : isDarkMode
+      ? 'bg-slate-800 text-slate-100 rounded-bl-sm border border-slate-700 shadow-md' // Dark Mode Bot
+      : 'bg-white text-slate-800 rounded-bl-sm border border-slate-200 shadow-sm'; // Light Mode Bot
+
+  const timestampColor = isUser
+    ? 'text-blue-100'
+    : isDarkMode ? 'text-slate-400' : 'text-slate-500';
+
   return (
     <div className={`flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div 
         className={`
-          max-w-[90%] md:max-w-[80%] rounded-2xl px-5 py-4 shadow-md
-          ${isUser 
-            ? 'bg-primary text-white rounded-br-sm' 
-            : 'bg-slate-800 text-slate-100 rounded-bl-sm border border-slate-700'}
+          max-w-[90%] md:max-w-[80%] rounded-2xl px-5 py-4
+          ${bubbleStyle}
         `}
       >
         {message.image && (
@@ -56,7 +70,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         <div className="text-sm md:text-base">
           {renderContent(message.text)}
         </div>
-        <div className={`text-[10px] mt-2 opacity-50 ${isUser ? 'text-blue-200' : 'text-slate-400'}`}>
+        <div className={`text-[10px] mt-2 opacity-70 ${timestampColor}`}>
           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>

@@ -26,3 +26,19 @@ export interface ChatState {
   isTyping: boolean;
   topic: Topic;
 }
+
+export interface User {
+  email: string;
+  id: string;
+  phoneNumber?: string;
+  about?: string;
+  avatar?: string; // Base64 string
+}
+
+export interface MemoryItem {
+  id: string;
+  content: string;
+  language: string;
+  timestamp: number;
+  tags: string[];
+}

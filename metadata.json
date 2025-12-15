@@ -1,6 +1,6 @@
 {
-  "name": "Copy of CS Companion AI",
-  "description": "A mobile-first AI tutor designed specifically for Computer Science students to help with algorithms, debugging, and code concepts.",
+  "name": "InfoStack",
+  "description": "InfoStack: The intelligent knowledge base and AI tutor for Computer Science students.",
   "requestFramePermissions": [
     "camera",
     "microphone"
