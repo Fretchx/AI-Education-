@@ -1,5 +1,7 @@
+
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
-import { Topic, Message, Role } from "../types";
+import { Topic, StudentProfile } from "../types";
+import { getPersonalizedSystemInstruction } from "./personalization";
 
 const SYSTEM_INSTRUCTION_BASE = `You are an expert Computer Science Professor and Senior Software Engineer. 
 Your goal is not just to provide code, but to teach the student *how* to solve it.
@@ -10,10 +12,10 @@ WHEN THE USER PROVIDES CODE, ANALYZE THE REQUEST TYPE AND USE THE APPROPRIATE FO
 If the user asks to find errors, explain logic, or refactor:
 
 ### 1. 🧐 Methodology & Concepts
-Briefly explain what methods, algorithms, or design patterns are used (e.g., "Recursive Depth-First Search").
+Briefly explain what methods, algorithms, or design patterns are used.
 
 ### 2. 🐞 Diagnosis (Find Error)
-Identify specific errors (Syntax, Logical, Runtime). Explain *why* it fails. (Skip if code is correct).
+Identify specific errors (Syntax, Logical, Runtime). Explain *why* it fails.
 
 ### 3. ✅ Corrected Code
 Provide the fully fixed code block with explanatory comments.
@@ -22,16 +24,16 @@ Provide the fully fixed code block with explanatory comments.
 A brief lesson summarizing the core concept.
 
 === SCENARIO 2: CONVERTING / TRANSLATING LANGUAGES ===
-If the user asks to convert code from one language to another (e.g., Java to Python, C to C++):
+If the user asks to convert code from one language to another:
 
 ### 1. 🔄 Conversion Logic
-Explain how major constructs map to the new language (e.g., "Java's ArrayList maps to C++ std::vector", or "Python handles memory automatically, unlike C").
+Explain how major constructs map to the new language.
 
 ### 2. 💻 Converted Code
-Provide the equivalent code in the target language, adhering to that language's idioms (Pythonic, Modern C++, etc.).
+Provide the equivalent code in the target language.
 
 ### 3. 💡 Language Specific Differences
-Highlight important differences (e.g., Memory Management, Type System, Performance implications).
+Highlight important differences (Memory, Types, Performance).
 
 ---
 GENERAL RULES:
@@ -44,35 +46,39 @@ GENERAL RULES:
 let chatSession: Chat | null = null;
 let currentTopic: Topic = Topic.GENERAL;
 
-const getSystemInstruction = (topic: Topic): string => {
-  let specific = "";
-  switch (topic) {
-    case Topic.ALGORITHMS:
-      specific = "Focus heavily on efficiency, edge cases, and mathematical proofs where relevant.";
-      break;
-    case Topic.WEB_DEV:
-      specific = "Focus on modern frameworks (React, Next.js), accessibility, and best practices.";
-      break;
-    case Topic.SYSTEMS:
-      specific = "Focus on memory management, concurrency, and low-level details.";
-      break;
-    default:
-      specific = "Cover a broad range of CS fundamentals.";
-  }
-  return `${SYSTEM_INSTRUCTION_BASE}\nCurrent Context: ${specific}`;
-};
-
-export const initializeChat = (topic: Topic) => {
+export const initializeChat = (topic: Topic, userProfile?: StudentProfile) => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     currentTopic = topic;
+    
+    let specificContext = "";
+    switch (topic) {
+      case Topic.ALGORITHMS:
+        specificContext = "Focus heavily on efficiency, edge cases, and mathematical proofs where relevant.";
+        break;
+      case Topic.WEB_DEV:
+        specificContext = "Focus on modern frameworks (React, Next.js), accessibility, and best practices.";
+        break;
+      case Topic.SYSTEMS:
+        specificContext = "Focus on memory management, concurrency, and low-level details.";
+        break;
+      default:
+        specificContext = "Cover a broad range of CS fundamentals.";
+    }
+
+    const baseWithTopic = `${SYSTEM_INSTRUCTION_BASE}\nCurrent Context: ${specificContext}`;
+    
+    // Inject ML Personalization
+    const finalInstruction = getPersonalizedSystemInstruction(baseWithTopic, userProfile);
+
     chatSession = ai.chats.create({
       model: 'gemini-2.5-flash',
       config: {
-        systemInstruction: getSystemInstruction(topic),
+        systemInstruction: finalInstruction,
         temperature: 0.7,
       },
     });
+    console.log("Chat Initialized with Personalization:", !!userProfile);
   } catch (error) {
     console.error("Failed to initialize Gemini:", error);
   }
@@ -83,6 +89,7 @@ export const sendMessageToGemini = async (
   imagebase64?: string,
   onChunk?: (text: string) => void
 ): Promise<string> => {
+  // Auto-init if missing (fallback without profile)
   if (!chatSession) {
     initializeChat(currentTopic);
   }

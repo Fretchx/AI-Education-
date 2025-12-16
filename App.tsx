@@ -4,6 +4,7 @@ import { Message, Role, Topic, User } from './types';
 import { initializeChat, sendMessageToGemini } from './services/gemini';
 import { getCurrentUser, logout, updateUserProfile } from './services/auth';
 import { parseShareableLink } from './services/share';
+import { analyzeAndAdapt } from './services/personalization';
 import MessageBubble from './components/MessageBubble';
 import TopicSelector from './components/TopicSelector';
 import AuthScreen from './components/AuthScreen';
@@ -76,19 +77,27 @@ const App: React.FC = () => {
       const currentUser = getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
-        initWelcomeMessage();
+        initWelcomeMessage(currentUser);
       }
     };
 
     checkSession();
   }, []);
 
-  const initWelcomeMessage = () => {
+  const initWelcomeMessage = (u: User) => {
+    // If returning user, customize welcome
+    let text = "Welcome to InfoStack! I'm your CS Companion.";
+    if (u.profile?.preferredLanguage) {
+      text += ` I see you like ${u.profile.preferredLanguage}. Paste your code below!`;
+    } else {
+      text += " Paste your code below, and I'll act as your guide.";
+    }
+
     setMessages([
       {
         id: 'welcome',
         role: Role.MODEL,
-        text: "Welcome to InfoStack! I'm your CS Companion. Paste your code below, and I'll act as your guide—identifying errors, converting languages, and explaining concepts.",
+        text: text,
         timestamp: Date.now()
       }
     ]);
@@ -96,9 +105,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      // Don't re-initialize chat if viewing a shared session (unless user types)
+      // Initialize Chat with Personalization
       if (!isSharedSession) {
-          initializeChat(topic);
+          initializeChat(topic, user.profile);
       }
     }
   }, [topic, user]);
@@ -189,7 +198,8 @@ const App: React.FC = () => {
       image: attachedImage || undefined
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    const newMessages = [...messages, newMessage];
+    setMessages(newMessages);
     setInputText('');
     setAttachedImage(null);
     setIsLoading(true);
@@ -213,6 +223,13 @@ const App: React.FC = () => {
             ));
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         });
+
+        // Trigger Personalization ML Analysis in background after every 3rd message
+        if (user && !user.id.startsWith('guest') && newMessages.length % 3 === 0) {
+            console.log("Triggering Learning Analysis...");
+            analyzeAndAdapt(user.id, newMessages.slice(-6)); 
+        }
+
     } catch (err) {
         console.error(err);
         setMessages(prev => prev.map(msg => 
@@ -227,7 +244,7 @@ const App: React.FC = () => {
 
   // If not authenticated, show auth screen
   if (!user) {
-    return <AuthScreen onAuthSuccess={(u) => { setUser(u); initWelcomeMessage(); }} />;
+    return <AuthScreen onAuthSuccess={(u) => { setUser(u); initWelcomeMessage(u); }} />;
   }
 
   // --- Dynamic Theme Classes ---

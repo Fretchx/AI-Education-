@@ -1,3 +1,4 @@
+
 export enum Role {
   USER = 'user',
   MODEL = 'model'
@@ -27,12 +28,24 @@ export interface ChatState {
   topic: Topic;
 }
 
+export interface StudentProfile {
+  userId: string;
+  codingLevel: 'Beginner' | 'Intermediate' | 'Advanced';
+  preferredLanguage: string;
+  learningStyle: 'Theoretical' | 'Practical' | 'Socratic' | 'Visual';
+  strengths: string[];
+  weaknesses: string[];
+  topicsMastered: string[];
+  lastUpdated: number;
+}
+
 export interface User {
   email: string;
   id: string;
   phoneNumber?: string;
   about?: string;
   avatar?: string; // Base64 string
+  profile?: StudentProfile; // Linked ML Profile
 }
 
 export interface MemoryItem {
