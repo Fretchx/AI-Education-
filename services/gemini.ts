@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
-import { Topic, StudentProfile } from "../types";
+import { Topic, StudentProfile, Message, Role } from "../types";
 import { getPersonalizedSystemInstruction } from "./personalization";
 
 const SYSTEM_INSTRUCTION_BASE = `You are an expert Computer Science Professor and Senior Software Engineer. 
@@ -46,7 +46,7 @@ GENERAL RULES:
 let chatSession: Chat | null = null;
 let currentTopic: Topic = Topic.GENERAL;
 
-export const initializeChat = (topic: Topic, userProfile?: StudentProfile) => {
+export const initializeChat = (topic: Topic, userProfile?: StudentProfile, history?: Message[]) => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     currentTopic = topic;
@@ -67,9 +67,16 @@ export const initializeChat = (topic: Topic, userProfile?: StudentProfile) => {
     }
 
     const baseWithTopic = `${SYSTEM_INSTRUCTION_BASE}\nCurrent Context: ${specificContext}`;
-    
-    // Inject ML Personalization
     const finalInstruction = getPersonalizedSystemInstruction(baseWithTopic, userProfile);
+
+    // Convert internal Message format to Gemini History format if provided
+    let geminiHistory;
+    if (history && history.length > 0) {
+      geminiHistory = history.map(msg => ({
+        role: msg.role === Role.USER ? 'user' : 'model',
+        parts: [{ text: msg.text }]
+      }));
+    }
 
     chatSession = ai.chats.create({
       model: 'gemini-2.5-flash',
@@ -77,8 +84,9 @@ export const initializeChat = (topic: Topic, userProfile?: StudentProfile) => {
         systemInstruction: finalInstruction,
         temperature: 0.7,
       },
+      history: geminiHistory
     });
-    console.log("Chat Initialized with Personalization:", !!userProfile);
+    console.log("Chat Initialized. Profile:", !!userProfile, "History:", history?.length);
   } catch (error) {
     console.error("Failed to initialize Gemini:", error);
   }
@@ -89,7 +97,6 @@ export const sendMessageToGemini = async (
   imagebase64?: string,
   onChunk?: (text: string) => void
 ): Promise<string> => {
-  // Auto-init if missing (fallback without profile)
   if (!chatSession) {
     initializeChat(currentTopic);
   }

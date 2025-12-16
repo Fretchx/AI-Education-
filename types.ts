@@ -39,19 +39,35 @@ export interface StudentProfile {
   lastUpdated: number;
 }
 
+export interface UserPreferences {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  twoFactorAuth: boolean;
+  publicProfile: boolean;
+}
+
 export interface User {
   email: string;
   id: string;
+  displayName?: string;
   phoneNumber?: string;
   about?: string;
   avatar?: string; // Base64 string
   profile?: StudentProfile; // Linked ML Profile
+  preferences?: UserPreferences;
 }
 
 export interface MemoryItem {
   id: string;
+  userId: string;
   content: string;
   language: string;
   timestamp: number;
   tags: string[];
+}
+
+export interface ChatHistory {
+  userId: string;
+  messages: Message[];
+  lastUpdated: number;
 }

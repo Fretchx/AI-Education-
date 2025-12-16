@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { saveToMemory } from '../services/memory';
+import { Clipboard, Bookmark, Copy as CopyIcon, Download } from './Icons';
 
 interface CodeBlockProps {
   language: string;
@@ -48,23 +50,17 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
            <button 
             onClick={handleSave}
             className="text-xs text-slate-400 hover:text-blue-400 transition-colors flex items-center gap-1"
-            title="Save to Knowledge Base (Pinecone)"
+            title="Save to Library"
           >
-            {saved ? (
-              <span className="text-blue-400">Saved</span>
-            ) : (
-              <span>Save to KB</span>
-            )}
+            <Bookmark className={`w-3 h-3 ${saved ? 'text-blue-400 fill-blue-400' : ''}`} />
+            {saved ? "Saved" : "Save"}
           </button>
           <button 
             onClick={handleCopy}
             className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1"
           >
-            {copied ? (
-              <span className="text-green-400">Copied!</span>
-            ) : (
-              <span>Copy</span>
-            )}
+            <CopyIcon className={`w-3 h-3 ${copied ? 'text-green-400' : ''}`} />
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
       </div>
