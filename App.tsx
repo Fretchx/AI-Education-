@@ -13,7 +13,7 @@ import AuthScreen from './components/AuthScreen';
 import KnowledgeBase from './components/KnowledgeBase';
 import ProfileSettings from './components/ProfileSettings';
 import ShareModal from './components/ShareModal';
-import ApiLab from './components/ApiLab';
+import { ApiLab } from './components/ApiLab';
 import { Folder, Share, CircleUser, Image as ImageIcon, Globe } from './components/Icons';
 
 const QUICK_ACTIONS = [

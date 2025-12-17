@@ -7,7 +7,7 @@ interface ApiLabProps {
   onClose: () => void;
 }
 
-const ApiLab: React.FC<ApiLabProps> = ({ isOpen, onClose }) => {
+export const ApiLab: React.FC<ApiLabProps> = ({ isOpen, onClose }) => {
   const [method, setMethod] = useState('GET');
   const [url, setUrl] = useState('https://jsonplaceholder.typicode.com/todos/1');
   const [body, setBody] = useState('{\n  "title": "Learn HTTP",\n  "body": "This is a test request",\n  "userId": 1\n}');
@@ -241,5 +241,3 @@ const ApiLab: React.FC<ApiLabProps> = ({ isOpen, onClose }) => {
     </div>
   );
 };
-
-export default ApiLab;
