@@ -1,4 +1,5 @@
 
+
 export enum Role {
   USER = 'user',
   MODEL = 'model'
@@ -44,6 +45,10 @@ export interface UserPreferences {
   pushNotifications: boolean;
   twoFactorAuth: boolean;
   publicProfile: boolean;
+  // Accessibility
+  reducedMotion?: boolean;
+  highContrast?: boolean;
+  largeText?: boolean;
 }
 
 export interface User {
