@@ -13,7 +13,8 @@ import AuthScreen from './components/AuthScreen';
 import KnowledgeBase from './components/KnowledgeBase';
 import ProfileSettings from './components/ProfileSettings';
 import ShareModal from './components/ShareModal';
-import { Folder, Share, CircleUser, Image as ImageIcon } from './components/Icons';
+import ApiLab from './components/ApiLab';
+import { Folder, Share, CircleUser, Image as ImageIcon, Globe } from './components/Icons';
 
 const QUICK_ACTIONS = [
   { label: "🐞 Debug Code", prompt: "Find the error in this code and explain it:" },
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   const [showKnowledgeBase, setShowKnowledgeBase] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showApiLab, setShowApiLab] = useState(false);
   const [isSharedSession, setIsSharedSession] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   
@@ -250,6 +252,7 @@ const App: React.FC = () => {
   return (
     <div className={`flex flex-col h-screen h-[100dvh] font-sans overflow-hidden transition-colors duration-300 ${bgClass}`}>
       <KnowledgeBase isOpen={showKnowledgeBase} onClose={() => setShowKnowledgeBase(false)} />
+      <ApiLab isOpen={showApiLab} onClose={() => setShowApiLab(false)} />
       <ProfileSettings isOpen={showSettings} onClose={() => setShowSettings(false)} user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} isDarkMode={isDarkMode} />
       <ShareModal isOpen={showShare} onClose={() => setShowShare(false)} messages={messages} />
 
@@ -262,6 +265,9 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2 md:gap-3">
               <button onClick={toggleTheme} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`}>
                 {isDarkMode ? "☀️" : "🌙"}
+              </button>
+              <button onClick={() => setShowApiLab(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="API Lab">
+                <Globe className="w-5 h-5" />
               </button>
               <button onClick={() => setShowShare(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="Share Session">
                 <Share className="w-5 h-5" />
