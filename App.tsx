@@ -259,9 +259,40 @@ const App: React.FC = () => {
       <header className={`flex-none border-b p-3 md:p-4 z-10 shadow-md transition-colors duration-300 ${headerClass}`}>
         <div className="max-w-3xl mx-auto flex flex-col gap-2 md:gap-3">
           <div className="flex justify-between items-center">
-            <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-2">
-              InfoStack
-            </h1>
+            
+            {/* Interactive Logo with Meaning Tooltip */}
+            <div className="relative group cursor-help">
+              <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-2 select-none">
+                InfoStack
+              </h1>
+              <div className="absolute left-0 top-full mt-3 w-64 p-4 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none z-50">
+                 {/* Decorative Arrow */}
+                 <div className="absolute -top-1.5 left-6 w-3 h-3 bg-[#0f172a] border-t border-l border-slate-700 rotate-45"></div>
+                 
+                 <div className="space-y-3">
+                   <div className="flex items-start gap-3">
+                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]"></div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">Info <span className="font-normal text-slate-500">/ˈɪnfəʊ/</span></p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                          Comprehensive AI-driven knowledge base.
+                        </p>
+                      </div>
+                   </div>
+                   <div className="flex items-start gap-3">
+                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">Stack <span className="font-normal text-slate-500">/stæk/</span></p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                          Abstract Data Type (LIFO). 
+                          <span className="block mt-1 italic text-purple-400/80">"Push questions, pop answers."</span>
+                        </p>
+                      </div>
+                   </div>
+                 </div>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 md:gap-3">
               <button onClick={toggleTheme} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`}>
                 {isDarkMode ? "☀️" : "🌙"}
