@@ -1,0 +1,22 @@
+
+{
+  "name": "InfoStack AI Tutor",
+  "short_name": "InfoStack",
+  "description": "The intelligent knowledge base and AI tutor for Computer Science students.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968292.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968292.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

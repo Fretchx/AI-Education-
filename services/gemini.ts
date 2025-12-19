@@ -69,24 +69,23 @@ export const initializeChat = (topic: Topic, userProfile?: StudentProfile, histo
     const baseWithTopic = `${SYSTEM_INSTRUCTION_BASE}\nCurrent Context: ${specificContext}`;
     const finalInstruction = getPersonalizedSystemInstruction(baseWithTopic, userProfile);
 
-    // Convert internal Message format to Gemini History format if provided
-    let geminiHistory;
-    if (history && history.length > 0) {
-      geminiHistory = history.map(msg => ({
+    // Filter history to remove loading states and transient messages
+    const geminiHistory = (history || [])
+      .filter(msg => !msg.isLoading && msg.text !== "Analyzing...")
+      .map(msg => ({
         role: msg.role === Role.USER ? 'user' : 'model',
         parts: [{ text: msg.text }]
       }));
-    }
 
     chatSession = ai.chats.create({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       config: {
         systemInstruction: finalInstruction,
         temperature: 0.7,
       },
       history: geminiHistory
     });
-    console.log("Chat Initialized. Profile:", !!userProfile, "History:", history?.length);
+    console.log("Chat Initialized. Topic:", topic, "History items:", geminiHistory.length);
   } catch (error) {
     console.error("Failed to initialize Gemini:", error);
   }
@@ -97,56 +96,62 @@ export const sendMessageToGemini = async (
   imagebase64?: string,
   onChunk?: (text: string) => void
 ): Promise<string> => {
+  // Always ensure a fresh AI instance for API calls to pick up potential key updates
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   if (!chatSession) {
     initializeChat(currentTopic);
-  }
-
-  if (!chatSession) {
-    throw new Error("Chat session could not be initialized.");
   }
 
   try {
     let responseText = "";
 
+    // Multimodal turns are more reliably handled by generateContentStream directly
     if (imagebase64) {
-       const messageContent = [
-         { text },
-         {
-           inlineData: {
-             mimeType: 'image/jpeg',
-             data: imagebase64
+       const response = await ai.models.generateContentStream({
+         model: 'gemini-3-flash-preview',
+         contents: [
+           {
+             role: 'user',
+             parts: [
+               { text: text || "Analyze this image" },
+               {
+                 inlineData: {
+                   mimeType: 'image/jpeg',
+                   data: imagebase64
+                 }
+               }
+             ]
            }
+         ],
+         config: {
+           systemInstruction: SYSTEM_INSTRUCTION_BASE
          }
-       ];
-
-       const streamResult = await chatSession.sendMessageStream({ 
-           message: messageContent 
        });
 
-       for await (const chunk of streamResult) {
-         const c = chunk as GenerateContentResponse;
-         if (c.text) {
-             responseText += c.text;
+       for await (const chunk of response) {
+         if (chunk.text) {
+             responseText += chunk.text;
              if (onChunk) onChunk(responseText);
          }
        }
-
-    } else {
+    } else if (chatSession) {
         const streamResult = await chatSession.sendMessageStream({ message: text });
         
         for await (const chunk of streamResult) {
-            const c = chunk as GenerateContentResponse;
-            if (c.text) {
-                responseText += c.text;
+            if (chunk.text) {
+                responseText += chunk.text;
                 if (onChunk) onChunk(responseText);
             }
         }
+    } else {
+       throw new Error("Chat session unavailable");
     }
 
     return responseText;
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "I encountered an error connecting to the neural network. Please check your connection or API key.";
+    return "I encountered an error connecting to the neural network. Please ensure the API_KEY environment variable is correctly configured.";
   }
 };

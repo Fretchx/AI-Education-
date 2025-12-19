@@ -1,9 +1,15 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>InfoStack</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5968/5968292.png" />
+    <title>InfoStack | AI CS Tutor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -40,6 +46,12 @@
       body {
         background-color: #0f172a; /* Slate 900 */
         color: #f8fafc; /* Slate 50 */
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: contain;
+      }
+      /* Ensure full height on mobile */
+      #root {
+        height: 100%;
       }
     </style>
   <script type="importmap">

@@ -45,10 +45,8 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Initial Session Check
   useEffect(() => {
     const checkSession = async () => {
-      // 1. Check for shared link (Override)
       try {
         const sharedData = await parseShareableLink();
         if (sharedData && Array.isArray(sharedData)) {
@@ -72,7 +70,6 @@ const App: React.FC = () => {
         console.error("Error parsing link", e);
       }
 
-      // 2. Check for logged in user and load their history
       const currentUser = getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
@@ -106,20 +103,17 @@ const App: React.FC = () => {
     setMessages([{ id: 'welcome', role: Role.MODEL, text: text, timestamp: Date.now() }]);
   };
 
-  // Re-initialize Chat when topic/user changes
   useEffect(() => {
     if (user && !isSharedSession) {
-        // Pass current messages as history so Gemini context is preserved on reload
         initializeChat(topic, user.profile, messages);
     }
-  }, [topic, user]); // Note: We don't depend on 'messages' here to avoid loop, we pass them initially
+  }, [topic, user]);
 
-  // Auto-Save History
   useEffect(() => {
     if (user && messages.length > 0 && !isSharedSession && !user.id.startsWith('guest')) {
       const saveTimer = setTimeout(() => {
         dbChats.saveHistory(user.id, messages);
-      }, 1000); // Debounce save
+      }, 1000);
       return () => clearTimeout(saveTimer);
     }
   }, [messages, user, isSharedSession]);
@@ -137,6 +131,16 @@ const App: React.FC = () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   };
 
+  const handleResetChat = () => {
+    if (user && !user.id.startsWith('guest')) {
+      if (window.confirm("Archiving current chat and starting a new conversation. Proceed?")) {
+        setMessages([]);
+        initWelcomeMessage(user);
+        initializeChat(topic, user.profile, []);
+      }
+    }
+  };
+
   const handleUpdateUser = async (updatedUser: User) => {
     try {
       await updateUserProfile(updatedUser);
@@ -148,8 +152,8 @@ const App: React.FC = () => {
 
   const handleQuickAction = (actionPrompt: string) => {
     setInputText((prev) => {
-        if (prev.trim().length > 0) return `${actionPrompt}\n\n${prev}`;
-        return actionPrompt + " ";
+        const base = prev.trim().length > 0 ? `${actionPrompt}\n\n${prev}` : `${actionPrompt} `;
+        return base;
     });
     inputRef.current?.focus();
   };
@@ -217,10 +221,8 @@ const App: React.FC = () => {
                 ? { ...msg, text: streamedText, isLoading: false } 
                 : msg
             ));
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         });
 
-        // Trigger personalization analysis less frequently to save tokens/performance
         if (user && !user.id.startsWith('guest') && newMessages.length % 4 === 0) {
             analyzeAndAdapt(user.id, newMessages.slice(-8)); 
         }
@@ -228,7 +230,7 @@ const App: React.FC = () => {
     } catch (err) {
         setMessages(prev => prev.map(msg => 
             msg.id === botMsgId 
-            ? { ...msg, text: "Connection error.", isLoading: false } 
+            ? { ...msg, text: "I'm having trouble connecting right now. Please try again.", isLoading: false } 
             : msg
         ));
     } finally {
@@ -245,7 +247,7 @@ const App: React.FC = () => {
     ? 'bg-slate-800 text-slate-100 placeholder-slate-500 border-slate-700' 
     : 'bg-slate-100 text-slate-900 placeholder-slate-400 border-slate-300';
   const quickActionClass = isDarkMode
-    ? 'bg-slate-800 border-slate-700 hover:border-primary hover:text-primary'
+    ? 'bg-slate-800 border-slate-700 hover:border-primary hover:text-primary shadow-sm'
     : 'bg-white border-slate-200 text-slate-700 hover:border-primary hover:text-primary shadow-sm';
   const iconButtonClass = isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100';
 
@@ -256,51 +258,46 @@ const App: React.FC = () => {
       <ProfileSettings isOpen={showSettings} onClose={() => setShowSettings(false)} user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} isDarkMode={isDarkMode} />
       <ShareModal isOpen={showShare} onClose={() => setShowShare(false)} messages={messages} />
 
-      <header className={`flex-none border-b p-3 md:p-4 z-10 shadow-md transition-colors duration-300 ${headerClass}`}>
+      <header className={`flex-none border-b p-3 md:p-4 z-10 shadow-md transition-colors duration-300 ${headerClass} pt-[env(safe-area-inset-top,12px)]`}>
         <div className="max-w-3xl mx-auto flex flex-col gap-2 md:gap-3">
           <div className="flex justify-between items-center">
             
-            {/* Interactive Logo with Meaning Tooltip */}
             <div className="relative group cursor-help">
               <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-2 select-none">
                 InfoStack
               </h1>
               <div className="absolute left-0 top-full mt-3 w-64 p-4 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none z-50">
-                 {/* Decorative Arrow */}
                  <div className="absolute -top-1.5 left-6 w-3 h-3 bg-[#0f172a] border-t border-l border-slate-700 rotate-45"></div>
-                 
                  <div className="space-y-3">
                    <div className="flex items-start gap-3">
                       <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]"></div>
                       <div>
                         <p className="text-xs font-bold text-slate-200">Info <span className="font-normal text-slate-500">/ˈɪnfəʊ/</span></p>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                          Comprehensive AI-driven knowledge base.
-                        </p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">AI knowledge base.</p>
                       </div>
                    </div>
                    <div className="flex items-start gap-3">
                       <div className="mt-1 w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div>
                       <div>
                         <p className="text-xs font-bold text-slate-200">Stack <span className="font-normal text-slate-500">/stæk/</span></p>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                          Abstract Data Type (LIFO). 
-                          <span className="block mt-1 italic text-purple-400/80">"Push questions, pop answers."</span>
-                        </p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">LIFO Architecture.</p>
                       </div>
                    </div>
                  </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-1 md:gap-3">
+              <button onClick={handleResetChat} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="New Conversation">
+                ✨
+              </button>
               <button onClick={toggleTheme} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`}>
                 {isDarkMode ? "☀️" : "🌙"}
               </button>
               <button onClick={() => setShowApiLab(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="API Lab">
                 <Globe className="w-5 h-5" />
               </button>
-              <button onClick={() => setShowShare(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="Share Session">
+              <button onClick={() => setShowShare(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="Share">
                 <Share className="w-5 h-5" />
               </button>
               <button onClick={() => setShowKnowledgeBase(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="Library">
@@ -318,7 +315,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-3 md:p-6 custom-scrollbar">
+      <main className="flex-1 overflow-y-auto p-3 md:p-6 custom-scrollbar bg-transparent">
         <div className="max-w-3xl mx-auto flex flex-col">
           {isSharedSession && (
              <div className="mb-6 p-3 bg-blue-900/30 border border-blue-800 rounded-lg text-sm text-blue-200 flex items-center gap-2">
@@ -328,13 +325,13 @@ const App: React.FC = () => {
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} isDarkMode={isDarkMode} />
           ))}
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-4" />
         </div>
       </main>
 
-      <footer className={`flex-none border-t pb-3 pt-2 px-3 md:px-4 md:pb-4 z-20 transition-colors duration-300 ${footerClass}`}>
+      <footer className={`flex-none border-t pb-[env(safe-area-inset-bottom,12px)] pt-2 px-3 md:px-4 z-20 transition-colors duration-300 ${footerClass}`}>
         <div className="max-w-3xl mx-auto flex flex-col gap-2">
-          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar no-scrollbar">
+          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar no-scrollbar scroll-smooth">
              {QUICK_ACTIONS.map((action, idx) => (
                <button key={idx} onClick={() => handleQuickAction(action.prompt)} className={`whitespace-nowrap px-2.5 py-1 md:px-3 md:py-1.5 rounded-full text-[10px] md:text-xs font-medium transition-all ${quickActionClass}`}>
                  {action.label}
@@ -344,20 +341,38 @@ const App: React.FC = () => {
           {attachedImage && (
             <div className={`flex items-center gap-2 p-2 rounded-lg w-fit ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100 border border-slate-200'}`}>
               <img src={attachedImage} alt="Preview" className="h-8 w-8 object-cover rounded" />
-              <button onClick={removeAttachment}>✕</button>
+              <button onClick={removeAttachment} className="p-1 text-xs hover:text-red-500">✕</button>
             </div>
           )}
           <form onSubmit={onSubmit} className="flex items-end gap-2">
             <div className="relative">
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" id="file-upload" />
-              <label htmlFor="file-upload" className={`flex items-center justify-center w-10 h-10 rounded-full cursor-pointer border ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+              <label htmlFor="file-upload" className={`flex items-center justify-center w-10 h-10 rounded-full cursor-pointer border transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`}>
                 <ImageIcon className="w-5 h-5" />
               </label>
             </div>
             <div className="flex-1 relative">
-              <textarea ref={inputRef} value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => {if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault(); onSubmit();}}} placeholder="Type a message..." className={`w-full rounded-2xl py-3 px-4 resize-none min-h-[44px] max-h-[120px] custom-scrollbar text-sm md:text-base font-mono border ${inputClass}`} rows={1} style={{ height: 'auto', minHeight: '44px' }} />
+              <textarea 
+                ref={inputRef} 
+                value={inputText} 
+                onChange={(e) => setInputText(e.target.value)} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault(); 
+                    onSubmit();
+                  }
+                }} 
+                placeholder="Ask InfoStack..." 
+                className={`w-full rounded-2xl py-3 px-4 resize-none min-h-[44px] max-h-[150px] custom-scrollbar text-sm md:text-base font-mono border transition-all ${inputClass}`} 
+                rows={1} 
+                style={{ height: 'auto', minHeight: '44px' }} 
+              />
             </div>
-            <button type="submit" disabled={isLoading} className={`flex items-center justify-center w-10 h-10 rounded-full ${isLoading ? 'bg-slate-800' : 'bg-primary text-white'}`}>
+            <button 
+              type="submit" 
+              disabled={isLoading || (!inputText.trim() && !attachedImage)} 
+              className={`flex items-center justify-center w-10 h-10 rounded-full transition-all transform active:scale-90 ${isLoading || (!inputText.trim() && !attachedImage) ? 'bg-slate-700 opacity-50 cursor-not-allowed' : 'bg-primary text-white shadow-lg shadow-blue-500/20 hover:bg-blue-600'}`}
+            >
               {isLoading ? "..." : "↑"}
             </button>
           </form>
