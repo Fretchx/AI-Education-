@@ -14,17 +14,16 @@ import KnowledgeBase from './components/KnowledgeBase';
 import ProfileSettings from './components/ProfileSettings';
 import ShareModal from './components/ShareModal';
 import { ApiLab } from './components/ApiLab';
-import { Folder, Share, CircleUser, Image as ImageIcon, Globe } from './components/Icons';
+import { Folder, Share, CircleUser, Image as ImageIcon, Globe, Activity } from './components/Icons';
 
 const QUICK_ACTIONS = [
-  { label: "🐞 Debug Code", prompt: "Find the error in this code and explain it:" },
-  { label: "🧠 Explain Logic", prompt: "Explain the logic and flow of this code step-by-step:" },
-  { label: "📉 Big O Analysis", prompt: "Analyze the Time and Space complexity (Big O) of this solution:" },
-  { label: "🧪 Gen Unit Tests", prompt: "Write comprehensive unit tests for this code covering edge cases:" },
-  { label: "⚡ Optimize Code", prompt: "Optimize this solution for better performance and efficiency:" },
-  { label: "📝 Write Docs", prompt: "Add JSDoc/docstrings and inline comments to explain this code:" },
-  { label: "✨ Clean Code", prompt: "Refactor this code to follow best practices and clean code principles:" },
-  { label: "🔀 Convert Lang", prompt: "Convert this code to Python (or specify target language):" },
+  { label: "🐞 Debug", prompt: "I have a bug in my code. Can you help me find it?" },
+  { label: "🧠 Logic", prompt: "Explain how this specific logic works step-by-step:" },
+  { label: "📉 Big O", prompt: "What is the time and space complexity of this solution?" },
+  { label: "🧪 Tests", prompt: "Write unit tests for this code using standard libraries:" },
+  { label: "⚡ Optimize", prompt: "How can I make this code more efficient or readable?" },
+  { label: "📝 Docs", prompt: "Add documentation and comments to this code snippet:" },
+  { label: "🔀 Convert", prompt: "Convert this code to another language (specify which):" },
 ];
 
 const App: React.FC = () => {
@@ -67,7 +66,7 @@ const App: React.FC = () => {
           return;
         }
       } catch (e) {
-        console.error("Error parsing link", e);
+        console.error("Link parsing failed", e);
       }
 
       const currentUser = getCurrentUser();
@@ -88,39 +87,35 @@ const App: React.FC = () => {
         initWelcomeMessage(u);
       }
     } catch (e) {
-      console.error("Failed to load history", e);
       initWelcomeMessage(u);
     }
   };
 
   const initWelcomeMessage = (u: User) => {
-    let text = "Welcome to InfoStack! I'm your CS Companion.";
-    if (u.profile?.preferredLanguage) {
-      text += ` I see you like ${u.profile.preferredLanguage}. Paste your code below!`;
-    } else {
-      text += " Paste your code below, and I'll act as your guide.";
-    }
+    const name = u.displayName || u.email.split('@')[0];
+    const text = `Hello ${name}! I'm **InfoStack**, your senior CS mentor. I'm ready to help you with **${topic}**. Paste your code or ask a theoretical question to get started.`;
     setMessages([{ id: 'welcome', role: Role.MODEL, text: text, timestamp: Date.now() }]);
   };
 
+  // Re-initialize chat when topic or user profile changes
   useEffect(() => {
     if (user && !isSharedSession) {
         initializeChat(topic, user.profile, messages);
     }
-  }, [topic, user]);
+  }, [topic, user?.profile]);
 
   useEffect(() => {
     if (user && messages.length > 0 && !isSharedSession && !user.id.startsWith('guest')) {
       const saveTimer = setTimeout(() => {
         dbChats.saveHistory(user.id, messages);
-      }, 1000);
+      }, 1500);
       return () => clearTimeout(saveTimer);
     }
   }, [messages, user, isSharedSession]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const handleLogout = () => {
     logout();
@@ -133,7 +128,7 @@ const App: React.FC = () => {
 
   const handleResetChat = () => {
     if (user && !user.id.startsWith('guest')) {
-      if (window.confirm("Archiving current chat and starting a new conversation. Proceed?")) {
+      if (window.confirm("Start a new session? Your current history will be archived.")) {
         setMessages([]);
         initWelcomeMessage(user);
         initializeChat(topic, user.profile, []);
@@ -146,14 +141,14 @@ const App: React.FC = () => {
       await updateUserProfile(updatedUser);
       setUser(updatedUser);
     } catch (e) {
-      console.error("Failed to update user", e);
+      console.error("Profile update failed", e);
     }
   };
 
   const handleQuickAction = (actionPrompt: string) => {
     setInputText((prev) => {
-        const base = prev.trim().length > 0 ? `${actionPrompt}\n\n${prev}` : `${actionPrompt} `;
-        return base;
+        const separator = prev.trim() ? "\n\n" : "";
+        return `${actionPrompt}${separator}${prev}`;
     });
     inputRef.current?.focus();
   };
@@ -163,8 +158,7 @@ const App: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const result = reader.result as string;
-        if (result.startsWith('data:image')) setAttachedImage(result);
+        setAttachedImage(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -174,9 +168,6 @@ const App: React.FC = () => {
     setAttachedImage(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
-
-  const getRawBase64 = (dataUrl: string) => dataUrl.split(',')[1];
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
   const onSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -188,7 +179,7 @@ const App: React.FC = () => {
     }
 
     const userMsgId = Date.now().toString();
-    const rawImage = attachedImage ? getRawBase64(attachedImage) : undefined;
+    const rawImage = attachedImage ? attachedImage.split(',')[1] : undefined;
     
     const newMessage: Message = {
       id: userMsgId,
@@ -209,13 +200,13 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, {
       id: botMsgId,
       role: Role.MODEL,
-      text: "Analyzing...",
+      text: "Thinking...",
       timestamp: Date.now(),
       isLoading: true
     }]);
 
     try {
-        await sendMessageToGemini(newMessage.text || "Analyze this image", rawImage, (streamedText) => {
+        await sendMessageToGemini(newMessage.text || "Explain this image:", rawImage, (streamedText) => {
             setMessages(prev => prev.map(msg => 
                 msg.id === botMsgId 
                 ? { ...msg, text: streamedText, isLoading: false } 
@@ -223,14 +214,14 @@ const App: React.FC = () => {
             ));
         });
 
-        if (user && !user.id.startsWith('guest') && newMessages.length % 4 === 0) {
-            analyzeAndAdapt(user.id, newMessages.slice(-8)); 
+        if (user && !user.id.startsWith('guest') && newMessages.length % 5 === 0) {
+            analyzeAndAdapt(user.id, newMessages.slice(-10)); 
         }
 
     } catch (err) {
         setMessages(prev => prev.map(msg => 
             msg.id === botMsgId 
-            ? { ...msg, text: "I'm having trouble connecting right now. Please try again.", isLoading: false } 
+            ? { ...msg, text: "The neural link was interrupted. Please try again.", isLoading: false } 
             : msg
         ));
     } finally {
@@ -240,73 +231,49 @@ const App: React.FC = () => {
 
   if (!user) return <AuthScreen onAuthSuccess={(u) => { setUser(u); loadUserHistory(u); }} />;
 
-  const bgClass = isDarkMode ? 'bg-darker text-slate-100' : 'bg-slate-50 text-slate-900';
-  const headerClass = isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
-  const footerClass = isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
-  const inputClass = isDarkMode 
-    ? 'bg-slate-800 text-slate-100 placeholder-slate-500 border-slate-700' 
-    : 'bg-slate-100 text-slate-900 placeholder-slate-400 border-slate-300';
-  const quickActionClass = isDarkMode
-    ? 'bg-slate-800 border-slate-700 hover:border-primary hover:text-primary shadow-sm'
-    : 'bg-white border-slate-200 text-slate-700 hover:border-primary hover:text-primary shadow-sm';
-  const iconButtonClass = isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100';
+  const themeClasses = isDarkMode 
+    ? { bg: 'bg-darker text-slate-100', header: 'bg-slate-900/80 border-slate-800', footer: 'bg-slate-900 border-slate-800', input: 'bg-slate-800 border-slate-700 text-slate-100', icon: 'text-slate-400 hover:text-white hover:bg-slate-800' }
+    : { bg: 'bg-slate-50 text-slate-900', header: 'bg-white/80 border-slate-200', footer: 'bg-white border-slate-200', input: 'bg-slate-100 border-slate-300 text-slate-900', icon: 'text-slate-500 hover:text-slate-900 hover:bg-slate-200' };
 
   return (
-    <div className={`flex flex-col h-screen h-[100dvh] font-sans overflow-hidden transition-colors duration-300 ${bgClass}`}>
+    <div className={`flex flex-col h-screen h-[100dvh] font-sans overflow-hidden transition-all duration-500 ${themeClasses.bg}`}>
       <KnowledgeBase isOpen={showKnowledgeBase} onClose={() => setShowKnowledgeBase(false)} />
       <ApiLab isOpen={showApiLab} onClose={() => setShowApiLab(false)} />
       <ProfileSettings isOpen={showSettings} onClose={() => setShowSettings(false)} user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} isDarkMode={isDarkMode} />
       <ShareModal isOpen={showShare} onClose={() => setShowShare(false)} messages={messages} />
 
-      <header className={`flex-none border-b p-3 md:p-4 z-10 shadow-md transition-colors duration-300 ${headerClass} pt-[env(safe-area-inset-top,12px)]`}>
-        <div className="max-w-3xl mx-auto flex flex-col gap-2 md:gap-3">
+      <header className={`flex-none border-b p-3 md:p-4 z-30 shadow-sm backdrop-blur-lg sticky top-0 transition-colors ${themeClasses.header} pt-[env(safe-area-inset-top,12px)]`}>
+        <div className="max-w-4xl mx-auto flex flex-col gap-3">
           <div className="flex justify-between items-center">
-            
-            <div className="relative group cursor-help">
-              <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-2 select-none">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
                 InfoStack
               </h1>
-              <div className="absolute left-0 top-full mt-3 w-64 p-4 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none z-50">
-                 <div className="absolute -top-1.5 left-6 w-3 h-3 bg-[#0f172a] border-t border-l border-slate-700 rotate-45"></div>
-                 <div className="space-y-3">
-                   <div className="flex items-start gap-3">
-                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]"></div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-200">Info <span className="font-normal text-slate-500">/ˈɪnfəʊ/</span></p>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">AI knowledge base.</p>
-                      </div>
-                   </div>
-                   <div className="flex items-start gap-3">
-                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-200">Stack <span className="font-normal text-slate-500">/stæk/</span></p>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">LIFO Architecture.</p>
-                      </div>
-                   </div>
-                 </div>
-              </div>
             </div>
 
-            <div className="flex items-center gap-1 md:gap-3">
-              <button onClick={handleResetChat} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="New Conversation">
+            <div className="flex items-center gap-1 md:gap-2">
+              <button onClick={handleResetChat} className={`p-2 rounded-xl transition-all ${themeClasses.icon}`} title="New Session">
                 ✨
               </button>
-              <button onClick={toggleTheme} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`}>
+              <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-xl transition-all ${themeClasses.icon}`}>
                 {isDarkMode ? "☀️" : "🌙"}
               </button>
-              <button onClick={() => setShowApiLab(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="API Lab">
+              <button onClick={() => setShowApiLab(true)} className={`p-2 rounded-xl transition-all ${themeClasses.icon}`} title="API Playground">
                 <Globe className="w-5 h-5" />
               </button>
-              <button onClick={() => setShowShare(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="Share">
+              <button onClick={() => setShowShare(true)} className={`p-2 rounded-xl transition-all ${themeClasses.icon}`} title="Share Link">
                 <Share className="w-5 h-5" />
               </button>
-              <button onClick={() => setShowKnowledgeBase(true)} className={`p-1.5 md:p-2 rounded-lg transition-colors ${iconButtonClass}`} title="Library">
+              <button onClick={() => setShowKnowledgeBase(true)} className={`p-2 rounded-xl transition-all ${themeClasses.icon}`} title="Snippet Library">
                 <Folder className="w-5 h-5" />
               </button>
-              <div className={`h-6 w-px hidden md:block ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
-              <button onClick={() => setShowSettings(true)} className="relative group focus:outline-none ml-1">
-                <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full border overflow-hidden flex items-center justify-center ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-200 border-slate-300'}`}>
-                  {user.avatar ? <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" /> : <CircleUser className="w-6 h-6 text-slate-400" />}
+              <div className="w-px h-6 bg-slate-700/50 mx-1"></div>
+              <button onClick={() => setShowSettings(true)} className="ml-1 p-0.5 rounded-full ring-2 ring-transparent hover:ring-blue-500 transition-all">
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-700 bg-slate-800 flex items-center justify-center">
+                  {user.avatar ? <img src={user.avatar} alt="Me" className="w-full h-full object-cover" /> : <CircleUser className="w-6 h-6 text-slate-500" />}
                 </div>
               </button>
             </div>
@@ -315,42 +282,55 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-3 md:p-6 custom-scrollbar bg-transparent">
-        <div className="max-w-3xl mx-auto flex flex-col">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar scroll-smooth">
+        <div className="max-w-4xl mx-auto">
           {isSharedSession && (
-             <div className="mb-6 p-3 bg-blue-900/30 border border-blue-800 rounded-lg text-sm text-blue-200 flex items-center gap-2">
-                 Viewing shared session
+             <div className="mb-8 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-sm text-blue-400 flex items-center justify-center gap-2 animate-pulse">
+                <Globe className="w-4 h-4" /> Shared Study Session • Ready-only mode
              </div>
           )}
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} isDarkMode={isDarkMode} />
           ))}
-          <div ref={messagesEndRef} className="h-4" />
+          {isLoading && messages[messages.length-1]?.isLoading && (
+             <div className="flex justify-start mb-8 animate-pulse">
+                <div className={`rounded-2xl px-5 py-4 ${isDarkMode ? 'bg-slate-800/50' : 'bg-white border border-slate-200'}`}>
+                    <div className="flex gap-2 items-center text-slate-400 text-sm">
+                        <Activity className="w-4 h-4 animate-spin" />
+                        <span>Compiling response...</span>
+                    </div>
+                </div>
+             </div>
+          )}
+          <div ref={messagesEndRef} className="h-8" />
         </div>
       </main>
 
-      <footer className={`flex-none border-t pb-[env(safe-area-inset-bottom,12px)] pt-2 px-3 md:px-4 z-20 transition-colors duration-300 ${footerClass}`}>
-        <div className="max-w-3xl mx-auto flex flex-col gap-2">
-          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar no-scrollbar scroll-smooth">
+      <footer className={`flex-none border-t pb-[env(safe-area-inset-bottom,16px)] pt-3 px-4 z-40 transition-colors ${themeClasses.footer}`}>
+        <div className="max-w-4xl mx-auto flex flex-col gap-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
              {QUICK_ACTIONS.map((action, idx) => (
-               <button key={idx} onClick={() => handleQuickAction(action.prompt)} className={`whitespace-nowrap px-2.5 py-1 md:px-3 md:py-1.5 rounded-full text-[10px] md:text-xs font-medium transition-all ${quickActionClass}`}>
+               <button 
+                 key={idx} 
+                 onClick={() => handleQuickAction(action.prompt)} 
+                 className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold transition-all border ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-blue-500 text-slate-300 hover:text-white' : 'bg-white border-slate-200 hover:border-blue-500 text-slate-600 hover:text-blue-600'} shadow-sm`}
+               >
                  {action.label}
                </button>
              ))}
           </div>
-          {attachedImage && (
-            <div className={`flex items-center gap-2 p-2 rounded-lg w-fit ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100 border border-slate-200'}`}>
-              <img src={attachedImage} alt="Preview" className="h-8 w-8 object-cover rounded" />
-              <button onClick={removeAttachment} className="p-1 text-xs hover:text-red-500">✕</button>
-            </div>
-          )}
-          <form onSubmit={onSubmit} className="flex items-end gap-2">
+
+          <form onSubmit={onSubmit} className="flex items-end gap-3 mb-2">
             <div className="relative">
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" id="file-upload" />
-              <label htmlFor="file-upload" className={`flex items-center justify-center w-10 h-10 rounded-full cursor-pointer border transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`}>
-                <ImageIcon className="w-5 h-5" />
+              <label htmlFor="file-upload" className={`flex items-center justify-center w-12 h-12 rounded-2xl cursor-pointer border transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'}`}>
+                {attachedImage ? <img src={attachedImage} className="w-full h-full object-cover rounded-2xl" /> : <ImageIcon className="w-6 h-6" />}
               </label>
+              {attachedImage && (
+                <button onClick={removeAttachment} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] border-2 border-slate-900">✕</button>
+              )}
             </div>
+            
             <div className="flex-1 relative">
               <textarea 
                 ref={inputRef} 
@@ -362,24 +342,29 @@ const App: React.FC = () => {
                     onSubmit();
                   }
                 }} 
-                placeholder="Ask InfoStack..." 
-                className={`w-full rounded-2xl py-3 px-4 resize-none min-h-[44px] max-h-[150px] custom-scrollbar text-sm md:text-base font-mono border transition-all ${inputClass}`} 
+                placeholder="Paste code or ask a question..." 
+                className={`w-full rounded-2xl py-3 px-5 resize-none min-h-[50px] max-h-[200px] custom-scrollbar text-[15px] font-mono border transition-all shadow-inner focus:ring-2 focus:ring-blue-500/50 focus:outline-none ${themeClasses.input}`} 
                 rows={1} 
-                style={{ height: 'auto', minHeight: '44px' }} 
+                style={{ height: 'auto', minHeight: '50px' }} 
               />
             </div>
+
             <button 
               type="submit" 
               disabled={isLoading || (!inputText.trim() && !attachedImage)} 
-              className={`flex items-center justify-center w-10 h-10 rounded-full transition-all transform active:scale-90 ${isLoading || (!inputText.trim() && !attachedImage) ? 'bg-slate-700 opacity-50 cursor-not-allowed' : 'bg-primary text-white shadow-lg shadow-blue-500/20 hover:bg-blue-600'}`}
+              className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all transform active:scale-90 ${isLoading || (!inputText.trim() && !attachedImage) ? 'bg-slate-700 opacity-50 cursor-not-allowed text-slate-500' : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-0.5'}`}
             >
-              {isLoading ? "..." : "↑"}
+              {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : <span className="text-xl font-bold">↑</span>}
             </button>
           </form>
+          <div className="text-[10px] text-center text-slate-500 pb-1">
+             **InfoStack** 2.5 • AI mentors can make mistakes. Verify critical code.
+          </div>
         </div>
       </footer>
     </div>
   );
 };
+
 const root = createRoot(document.getElementById('root')!);
 root.render(<App />);
