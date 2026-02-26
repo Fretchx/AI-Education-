@@ -20,7 +20,13 @@ RESPONSE STRUCTURE:
 Use Markdown for all formatting.
 `;
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const getEnv = (key: string): string | undefined => {
+  const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  const nodeLikeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return viteEnv?.[key] ?? nodeLikeEnv?.[key];
+};
+
+const DEFAULT_MODEL = getEnv('GEMINI_MODEL') || 'gemini-2.5-flash';
 
 const TOPIC_CONTEXT: Record<Topic, string> = {
   [Topic.GENERAL]: 'Provide broad-spectrum Computer Science guidance.',
@@ -33,7 +39,7 @@ const TOPIC_CONTEXT: Record<Topic, string> = {
 };
 
 const getApiKey = (): string => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  const apiKey = getEnv('GEMINI_API_KEY') || getEnv('API_KEY');
   if (!apiKey) {
     throw new Error('Missing Gemini API key. Set GEMINI_API_KEY (preferred) or API_KEY.');
   }
