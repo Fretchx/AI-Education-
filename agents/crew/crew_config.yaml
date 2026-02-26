@@ -1,0 +1,7 @@
+agents:
+  - id: lead_qualification_agent
+    role: Lead Qualification Agent
+  - id: recommendation_agent
+    role: Property Recommendation Agent
+  - id: scheduler_agent
+    role: Appointment Scheduler
