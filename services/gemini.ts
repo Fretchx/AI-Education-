@@ -45,6 +45,9 @@ export const initializeChat = (topic: Topic, userProfile?: StudentProfile, histo
       case Topic.AI_ML:
         topicContext = "Focus on mathematical foundations, model architectures, and data ethics.";
         break;
+      case Topic.AI_ENGINEERING_TOOLS:
+        topicContext = "Focus on practical AI engineering tooling: copilots, code review assistants, evals, test generation, CI/CD automation, and responsible usage patterns.";
+        break;
       default:
         topicContext = "Provide broad-spectrum Computer Science guidance.";
     }
