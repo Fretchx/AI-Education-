@@ -20,7 +20,8 @@ export enum Topic {
   WEB_DEV = 'Web Development',
   SYSTEMS = 'Systems & OS',
   DATABASE = 'Databases & SQL',
-  AI_ML = 'AI & Machine Learning'
+  AI_ML = 'AI & Machine Learning',
+  AI_ENGINEERING_TOOLS = 'AI Aided Engineering Tools'
 }
 
 export interface ChatState {
