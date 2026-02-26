@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, Chat } from "@google/genai";
 import { Topic, StudentProfile, Message, Role } from "../types";
 import { getPersonalizedSystemInstruction } from "./personalization";
 
@@ -21,50 +20,49 @@ RESPONSE STRUCTURE:
 Use Markdown for all formatting.
 `;
 
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+const TOPIC_CONTEXT: Record<Topic, string> = {
+  [Topic.GENERAL]: 'Provide broad-spectrum Computer Science guidance.',
+  [Topic.ALGORITHMS]: 'Focus on data structures, optimization, and rigorous algorithm analysis.',
+  [Topic.WEB_DEV]: 'Focus on modern web architecture, state management, and performance.',
+  [Topic.SYSTEMS]: 'Focus on low-level concepts, memory, concurrency, and OS internals.',
+  [Topic.DATABASE]: 'Focus on relational design, query optimization, indexing strategies, and transaction semantics.',
+  [Topic.AI_ML]: 'Focus on mathematical foundations, model architectures, and data ethics.',
+  [Topic.AI_ENGINEERING_TOOLS]: 'Focus on practical AI engineering tooling: copilots, code review assistants, evals, test generation, CI/CD automation, observability, and responsible usage patterns.'
+};
+
+const getApiKey = (): string => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing Gemini API key. Set GEMINI_API_KEY (preferred) or API_KEY.');
+  }
+  return apiKey;
+};
+
 let chatSession: Chat | null = null;
 let currentTopic: Topic = Topic.GENERAL;
 let currentProfile: StudentProfile | undefined;
 
 export const initializeChat = (topic: Topic, userProfile?: StudentProfile, history?: Message[]) => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     currentTopic = topic;
     currentProfile = userProfile;
-    
-    let topicContext = "";
-    switch (topic) {
-      case Topic.ALGORITHMS:
-        topicContext = "Focus on data structures, optimization, and rigorous algorithm analysis.";
-        break;
-      case Topic.WEB_DEV:
-        topicContext = "Focus on modern web architecture, state management, and performance.";
-        break;
-      case Topic.SYSTEMS:
-        topicContext = "Focus on low-level concepts, memory, concurrency, and OS internals.";
-        break;
-      case Topic.AI_ML:
-        topicContext = "Focus on mathematical foundations, model architectures, and data ethics.";
-        break;
-      case Topic.AI_ENGINEERING_TOOLS:
-        topicContext = "Focus on practical AI engineering tooling: copilots, code review assistants, evals, test generation, CI/CD automation, and responsible usage patterns.";
-        break;
-      default:
-        topicContext = "Provide broad-spectrum Computer Science guidance.";
-    }
 
+    const topicContext = TOPIC_CONTEXT[topic] || TOPIC_CONTEXT[Topic.GENERAL];
     const baseWithTopic = `${SYSTEM_INSTRUCTION_BASE}\n\nTOPIC FOCUS: ${topicContext}`;
     const finalInstruction = getPersonalizedSystemInstruction(baseWithTopic, userProfile);
 
-    // Convert internal Message history to Gemini API format
     const geminiHistory = (history || [])
-      .filter(msg => !msg.isLoading && msg.text !== "Analyzing...")
+      .filter(msg => !msg.isLoading && msg.text !== 'Analyzing...')
       .map(msg => ({
         role: msg.role === Role.USER ? 'user' : 'model',
         parts: [{ text: msg.text }]
       }));
 
     chatSession = ai.chats.create({
-      model: 'gemini-3-pro-preview',
+      model: DEFAULT_MODEL,
       config: {
         systemInstruction: finalInstruction,
         temperature: 0.75,
@@ -72,78 +70,80 @@ export const initializeChat = (topic: Topic, userProfile?: StudentProfile, histo
       },
       history: geminiHistory
     });
-    
-    console.log(`[InfoStack] Session Initialized for ${topic}. History: ${geminiHistory.length} turns.`);
+
+    console.log(`[InfoStack] Session initialized for ${topic}. History: ${geminiHistory.length} turns.`);
   } catch (error) {
-    console.error("[InfoStack] Initialization failed:", error);
+    console.error('[InfoStack] Initialization failed:', error);
   }
 };
 
 export const sendMessageToGemini = async (
-  text: string, 
+  text: string,
   imagebase64?: string,
   onChunk?: (text: string) => void
 ): Promise<string> => {
-  // Always fetch a fresh AI instance to ensure we pick up potential key updates from the environment
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  // Lazy init if session is missing
+  let ai: GoogleGenAI;
+
+  try {
+    ai = new GoogleGenAI({ apiKey: getApiKey() });
+  } catch (error) {
+    console.error('[InfoStack] API key validation failed:', error);
+    return 'Configuration error: Gemini API key is missing. Add GEMINI_API_KEY to your environment.';
+  }
+
   if (!chatSession) {
     initializeChat(currentTopic, currentProfile);
   }
 
   try {
-    let responseText = "";
+    let responseText = '';
 
     if (imagebase64) {
-       // Multimodal turns are handled as a single turn for safety in stream
-       const response = await ai.models.generateContentStream({
-         model: 'gemini-3-pro-preview',
-         contents: [
-           {
-             role: 'user',
-             parts: [
-               { text: text || "Analyze this code/image:" },
-               {
-                 inlineData: {
-                   mimeType: 'image/jpeg',
-                   data: imagebase64
-                 }
-               }
-             ]
-           }
-         ],
-         config: {
-           systemInstruction: SYSTEM_INSTRUCTION_BASE
-         }
-       });
-
-       for await (const chunk of response) {
-         if (chunk.text) {
-             responseText += chunk.text;
-             if (onChunk) onChunk(responseText);
-         }
-       }
-    } else if (chatSession) {
-        const streamResult = await chatSession.sendMessageStream({ message: text });
-        
-        for await (const chunk of streamResult) {
-            if (chunk.text) {
-                responseText += chunk.text;
-                if (onChunk) onChunk(responseText);
-            }
+      const response = await ai.models.generateContentStream({
+        model: DEFAULT_MODEL,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: text || 'Analyze this code/image:' },
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: imagebase64
+                }
+              }
+            ]
+          }
+        ],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION_BASE
         }
+      });
+
+      for await (const chunk of response) {
+        if (chunk.text) {
+          responseText += chunk.text;
+          if (onChunk) onChunk(responseText);
+        }
+      }
+    } else if (chatSession) {
+      const streamResult = await chatSession.sendMessageStream({ message: text });
+
+      for await (const chunk of streamResult) {
+        if (chunk.text) {
+          responseText += chunk.text;
+          if (onChunk) onChunk(responseText);
+        }
+      }
     } else {
-       throw new Error("Chat session lost. Please reload.");
+      throw new Error('Chat session lost. Please reload.');
     }
 
     return responseText;
-
   } catch (error) {
-    console.error("[InfoStack] API error:", error);
-    // If it's an auth error, we might need to reset
-    if (error instanceof Error && error.message.includes("401")) {
-        return "Authentication error. Please ensure your API key is correctly configured.";
+    console.error('[InfoStack] API error:', error);
+    if (error instanceof Error && error.message.includes('401')) {
+      return 'Authentication error. Please ensure your API key is correctly configured.';
     }
     return "I'm having trouble processing that right now. Could you try rephrasing or checking your connection?";
   }
